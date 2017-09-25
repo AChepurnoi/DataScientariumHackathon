@@ -9,7 +9,8 @@ export default class PredictForm extends React.Component {
         this.state = {
             picture: null
         };
-        this.size = 512;
+        this.width = 768;
+        this.height = 768;
 
     }
 
@@ -28,8 +29,9 @@ export default class PredictForm extends React.Component {
 
 
             <div className="row mar-top">
-                <div className="col-sm-4 col-md-offset-3 col-sm-offset-2">
-                    <div id="svg"></div>
+                <div className="col-sm-6 col-md-offset-2 col-sm-offset-2">
+                    <canvas id="svg" ref={(canvas) => this.canvas = canvas} height={this.height}
+                            width={this.width}></canvas>
                     <input className="hide" id="hidden_image_input" type="file"
                            ref={(input) => this.imageInput = input}
                            onChange={() => this.readData()}/>
@@ -44,9 +46,9 @@ export default class PredictForm extends React.Component {
 
 
     drawPredictions(data) {
-
-        let wk = this.size / this.img.width;
-        let hk = this.size / this.img.height;
+        let self = this;
+        let wk = this.width / this.img.width;
+        let hk = this.height / this.img.height;
 
         let rectangles = data.map(obs => ({
             w: (obs.x2 - obs.x1) * wk,
@@ -58,7 +60,7 @@ export default class PredictForm extends React.Component {
 
         rectangles = rectangles.map(r => ({
             confidence: r.confidence,
-            points: [r.x, r.y, r.x + r.w, r.y, r.x + r.w, r.y + r.h, r.x, r.y + r.h, r.x, r.y]
+            points: [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h], [r.x, r.y]]
         }));
 
         let danger = '#FF0000';
@@ -72,35 +74,30 @@ export default class PredictForm extends React.Component {
         };
 
 
-        rectangles.forEach(r => this.svg.polyline(r.points)
-            .fill('none')
-            .stroke({
-                width: 1,
-                color: colorPicker(r.confidence)
-            }))
+        rectangles.forEach(obj => {
+            let pts = obj.points;
+            let ctx = self.canvas.getContext("2d");
+            ctx.beginPath();
+            pts.forEach(p => ctx.lineTo(p[0], p[1]));
+            ctx.strokeStyle = colorPicker(obj.confidence);
+            ctx.stroke();
+        });
 
     }
 
     readData() {
-        this.svg.rect(512, 512).fill("#FFF");
         let reader = new FileReader();
         let file = this.imageInput.files[0];
         let self = this;
 
         reader.readAsDataURL(file);
         reader.onload = (event) => {
-            this.img = new Image();
-            this.img.src = reader.result;
-
-            this.setState({picture: reader.result});
-            self.svg.image(reader.result, self.size, self.size);
+            self.img = new Image();
+            self.img.src = reader.result;
+            self.img.onload = () => self.canvas.getContext("2d").drawImage(self.img, 0, 0, self.width, self.height);
+            self.setState({picture: reader.result});
             api.predict(reader.result).then(resp => self.drawPredictions(resp.data));
         }
-    }
-
-    componentDidMount() {
-        let svg = SVG('svg').size(this.size, this.size);
-        this.svg = svg
     }
 
 }
