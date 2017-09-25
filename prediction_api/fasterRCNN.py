@@ -18,7 +18,7 @@ sys.setrecursionlimit(40000)
 def format_img_size(img, C):
     """ formats the image size based on config """
     img_min_side = float(C.im_size)
-    (height, width, _) = img.shape
+    height, width, = img.shape[0], img.shape[1]
 
     if width <= height:
         ratio = img_min_side / width
@@ -67,7 +67,7 @@ class FasterRCNN:
                  config_path: str,
                  model_path: str,
                  num_rois: int = 4,
-                 bbox_threshold: int = 0.3,
+                 bbox_threshold: int = 0.01,
                  use_horizontal_flips: bool = False,
                  use_vertical_flips: bool = False,
                  rot_90: bool = False):
@@ -126,8 +126,8 @@ class FasterRCNN:
         self.model_rpn.compile(optimizer='sgd', loss='mse')
         self.model_classifier.compile(optimizer='sgd', loss='mse')
 
-    def predict(self, image):
-        img = image[::-1]
+    def predict(self, path):
+        img = cv2.imread(path)
 
         X, ratio = format_img(img, self.config)
         X = np.transpose(X, (0, 2, 3, 1))
@@ -153,7 +153,7 @@ class FasterRCNN:
             if jk == R.shape[0] // self.num_rois:
                 # pad R
                 curr_shape = ROIs.shape
-                target_shape = (curr_shape[0], C.num_rois, curr_shape[2])
+                target_shape = (curr_shape[0], self.num_rois, curr_shape[2])
                 ROIs_padded = np.zeros(target_shape).astype(ROIs.dtype)
                 ROIs_padded[:, :curr_shape[1], :] = ROIs
                 ROIs_padded[0, curr_shape[1]:, :] = ROIs[0, 0, :]
